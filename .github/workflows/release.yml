@@ -81,6 +81,9 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a ./release/*.AppImage --snapshot build/linux-appimage-panel.png
           dpkg-deb --info release/*.deb
           tar -tzf release/*.tar.gz
+          sudo apt-get install -y ./release/*.deb
+          basilisk-pulse --version
+          sudo apt-get remove -y basilisk-pulse
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}

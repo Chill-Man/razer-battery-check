@@ -20,3 +20,6 @@ HyperSpeed receivers. Separate dock/HyperPolling PIDs and Bluetooth are not
 currently supported. Cached readings are marked as last known.
 
 https://github.com/Chill-Man/razer-battery-check
+
+Project software: MIT License. Razer product imagery and trademarks retain
+their respective owners' rights and are not relicensed under MIT.
