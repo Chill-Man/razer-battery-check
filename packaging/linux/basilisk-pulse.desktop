@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Basilisk Pulse
+Comment=Razer Basilisk battery level and time remaining
+Exec=basilisk-pulse --show
+Icon=basilisk-pulse
+Terminal=false
+Categories=Utility;Qt;
+StartupNotify=true

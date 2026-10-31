@@ -1,4 +1,5 @@
 #include "battery.h"
+#include <windows.h>
 #include <windowsx.h>
 #include <shellapi.h>
 #include <d2d1.h>

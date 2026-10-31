@@ -2,6 +2,13 @@
 #include <iostream>
 #include <cmath>
 #include <cstdlib>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <codecvt>
+#include <locale>
+static bool DeleteFileW(const wchar_t* path) { return std::filesystem::remove(std::filesystem::u8path(std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(path))); }
+#endif
 #include <fstream>
 #include <filesystem>
 static int failures = 0;

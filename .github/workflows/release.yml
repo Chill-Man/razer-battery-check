@@ -1,0 +1,123 @@
+name: Build release packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86
+            runner: windows-2025
+          - arch: x64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run native regression tests
+        shell: pwsh
+        run: ./build.ps1 -Architecture ${{ matrix.arch }}
+      - name: Package portable ZIP and Setup
+        shell: pwsh
+        run: ./packaging/package-windows.ps1 -Architecture ${{ matrix.arch }} -SkipBuild
+      - name: Check executable startup and clean shutdown
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/${{ matrix.arch }}/BasiliskPulse.exe').Path
+          $app = Start-Process -FilePath $exe -WindowStyle Hidden -PassThru
+          Start-Sleep -Seconds 2
+          $app.Refresh()
+          if ($app.HasExited) { throw "App exited early: $($app.ExitCode)" }
+          Stop-Process -Id $app.Id
+          $app.WaitForExit()
+      - name: Verify silent installation and uninstall
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release/*-setup.exe | Select-Object -First 1
+          $destination = Join-Path $env:RUNNER_TEMP 'BasiliskPulse-install-test'
+          $process = Start-Process $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$destination") -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or !(Test-Path "$destination/BasiliskPulse.exe")) { throw 'Installer smoke test failed' }
+          $process = Start-Process "$destination/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or (Test-Path "$destination/BasiliskPulse.exe")) { throw 'Uninstaller smoke test failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: release/*
+          if-no-files-found: error
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake qtbase5-dev qtwayland5 libqt5svg5-dev libgl1-mesa-dev xvfb xauth patchelf desktop-file-utils libfuse2
+      - name: Build and test
+        run: |
+          cmake -S . -B build/linux -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/linux --parallel 4
+          ctest --test-dir build/linux --output-on-failure
+          ./build/linux/basilisk-pulse --version
+          xvfb-run -a ./build/linux/basilisk-pulse --snapshot build/linux-panel.png
+      - name: Build DEB, archive and AppImage
+        run: bash packaging/package-linux.sh
+      - name: Verify packaged runtime
+        run: |
+          ./release/*.AppImage --appimage-extract-and-run --version
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a ./release/*.AppImage --snapshot build/linux-appimage-panel.png
+          dpkg-deb --info release/*.deb
+          tar -tzf release/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: release/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-preview-${{ matrix.arch }}
+          path: build/linux*-panel.png
+  draft-release:
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: windows-*
+          path: release
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-x86_64
+          path: release
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-aarch64
+          path: release
+          merge-multiple: true
+      - name: Checksums and draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(tr -d '\r\n' < VERSION)
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cd ..
+          gh release create "v$version" release/* --draft --target "$GITHUB_SHA" --title "Basilisk Pulse $version — Windows + Linux" --notes-file docs/RELEASE-NOTES.md

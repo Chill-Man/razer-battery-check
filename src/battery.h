@@ -1,6 +1,6 @@
 #pragma once
 #define NOMINMAX
-#include <windows.h>
+#include <filesystem>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -36,8 +36,8 @@ private:
     int64_t chargingTime=0;
 };
 unsigned RetryDelay(unsigned failures,unsigned normalInterval);
-Reading LoadLastReading(const std::wstring& path);
-bool SaveLastReading(const std::wstring& path,const Reading& reading);
+Reading LoadLastReading(const std::filesystem::path& path);
+bool SaveLastReading(const std::filesystem::path& path,const Reading& reading);
 int64_t Now();
 std::wstring DataDirectory();
 Reading ReadBattery(bool diagnostic = false);
@@ -47,8 +47,8 @@ struct Estimate { double hours = 0; bool learned = false; double percentPerHour 
 class History {
 public:
     std::vector<Sample> samples;
-    void Load(const std::wstring& path);
-    void Save(const std::wstring& path) const;
+    void Load(const std::filesystem::path& path);
+    void Save(const std::filesystem::path& path) const;
     void Add(const Reading& reading);
     Estimate Predict(int percent, double nominalHours = 110) const;
 };

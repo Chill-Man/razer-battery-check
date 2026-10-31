@@ -1,0 +1,22 @@
+BASILISK PULSE — WINDOWS
+
+Portable: extract the ZIP, then run BasiliskPulse.exe.
+No administrator rights, .NET, or Visual C++ runtime installation is needed.
+The app still stores its history/preferences in your Windows user profile.
+
+x64: most Intel/AMD PCs running 64-bit Windows 10/11.
+x86: 32-bit Windows 10, or compatibility use on 64-bit Windows.
+ARM64: native ARM64 Windows devices, including Snapdragon PCs.
+
+Look under hidden tray icons next to the clock. Click the percentage to open
+the panel. Open Settings for autostart, animation, economy polling and profiles.
+Use Exit in the panel to stop the app. Close it before upgrading.
+
+Updates: replace the portable EXE or run the matching Setup installer.
+The history in %LOCALAPPDATA%\BasiliskPulse is preserved.
+
+Supported: Basilisk V3 Pro and V3 Pro 35K, via USB cable or their stock
+HyperSpeed receivers. Separate dock/HyperPolling PIDs and Bluetooth are not
+currently supported. Cached readings are marked as last known.
+
+https://github.com/Chill-Man/razer-battery-check

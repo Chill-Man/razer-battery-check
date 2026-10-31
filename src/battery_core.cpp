@@ -1,14 +1,19 @@
 #include "battery.h"
-#include <setupapi.h>
-#include <hidsdi.h>
-#include <shlobj.h>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <filesystem>
-#include <iostream>
 #include <chrono>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 namespace pulse {
+static bool ReplaceFile(const std::filesystem::path& from,const std::filesystem::path& to) {
+#ifdef _WIN32
+    return MoveFileExW(from.c_str(),to.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
+#else
+    std::error_code error;std::filesystem::rename(from,to,error);return !error;
+#endif
+}
 const ModelInfo* ModelForPid(uint16_t pid) {
     static const ModelInfo original{L"Basilisk V3 Pro",L"history.tsv",L"NominalHours",110,32};
     static const ModelInfo updated{L"Basilisk V3 Pro 35K",L"history-35k.tsv",L"NominalHours35K",140,28};
@@ -49,7 +54,7 @@ unsigned RetryDelay(unsigned failures,unsigned normalInterval) {
     if(!failures||failures>5)return normalInterval;
     return std::min(seconds[failures-1],normalInterval);
 }
-Reading LoadLastReading(const std::wstring& path) {
+Reading LoadLastReading(const std::filesystem::path& path) {
     Reading r;unsigned version=0,pid=0;
     std::ifstream file{std::filesystem::path(path)};
     if(!(file>>version>>r.time>>pid>>r.raw>>r.charging)||version!=1||pid>65535)return Reading{};
@@ -57,90 +62,26 @@ Reading LoadLastReading(const std::wstring& path) {
     if(!ValidReading(r)||r.time>Now()+60||r.time<Now()-30*86400)return Reading{};
     r.connected=false;return r;
 }
-bool SaveLastReading(const std::wstring& path,const Reading& r) {
+bool SaveLastReading(const std::filesystem::path& path,const Reading& r) {
     if(!r.connected||!ValidReading(r))return false;
-    auto temp=path+L".tmp";
+    auto temp=path;temp+=L".tmp";
     {std::ofstream file{std::filesystem::path(temp)};file<<1<<' '<<r.time<<' '<<r.pid<<' '<<r.raw<<' '<<r.charging<<'\n';if(!file)return false;}
-    return MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
-}
-std::wstring DataDirectory() {
-    PWSTR path = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) return L".";
-    std::wstring dir = std::wstring(path) + L"\\BasiliskPulse"; CoTaskMemFree(path);
-    CreateDirectoryW(dir.c_str(), nullptr); return dir;
+    return ReplaceFile(temp,path);
 }
 bool ValidResponse(const unsigned char* b, unsigned char command) {
     unsigned char crc = 0; for (int i = 3; i <= 88; ++i) crc ^= b[i];
     return b[0] == 0 && b[1] == 2 && b[2] == 0x1f && b[3] == 0 && b[4] == 0 && b[5] == 0 && b[6] == 2 && b[7] == 7 && b[8] == command && b[89] == crc;
 }
-static bool Query(HANDLE handle, unsigned char command, int& value) {
-    unsigned char request[91] = {};
-    request[2] = 0x1f; request[6] = 2; request[7] = 7; request[8] = command;
-    for (int i = 3; i <= 88; ++i) request[89] ^= request[i];
-    // These two commands only request telemetry. No configuration commands are sent.
-    for (int attempt = 0; attempt < 4; ++attempt) {
-        if(HidD_SetFeature(handle,request,sizeof(request))){
-            Sleep(40+attempt*10);
-            for(int receive=0;receive<3;++receive){
-                unsigned char response[91]={};
-                if(HidD_GetFeature(handle,response,sizeof(response))&&ValidResponse(response,command)){value=response[10];return true;}
-                // A busy/late response can finish without resending the request.
-                Sleep(35+receive*15);
-            }
-        }
-        Sleep(60+attempt*40);
-    }
-    return false;
-}
-Reading ReadBattery(bool diagnostic) {
-    Reading result; result.time = Now();
-    GUID guid; HidD_GetHidGuid(&guid);
-    HDEVINFO devices = SetupDiGetClassDevsW(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
-    if (devices == INVALID_HANDLE_VALUE) { result.error = L"Не удалось получить список HID"; return result; }
-    SP_DEVICE_INTERFACE_DATA iface = {}; iface.cbSize = sizeof(iface);
-    // Only query whitelisted Basilisk Pro models; do not send telemetry to other products.
-    for (DWORD i = 0; SetupDiEnumDeviceInterfaces(devices, nullptr, &guid, i, &iface); ++i) {
-        DWORD bytes = 0; SetupDiGetDeviceInterfaceDetailW(devices, &iface, nullptr, 0, &bytes, nullptr);
-        std::vector<unsigned char> storage(bytes);
-        auto detail = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA_W*>(storage.data()); detail->cbSize = sizeof(*detail);
-        if (!SetupDiGetDeviceInterfaceDetailW(devices, &iface, detail, bytes, nullptr, nullptr)) continue;
-        std::wstring path = detail->DevicePath;
-        std::transform(path.begin(), path.end(), path.begin(), [](wchar_t c) { return (wchar_t)towlower(c); });
-        if (path.find(L"vid_1532&pid_") == std::wstring::npos) continue;
-        HANDLE h = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
-        if (h == INVALID_HANDLE_VALUE) continue;
-        HIDD_ATTRIBUTES attributes={};attributes.Size=sizeof(attributes);
-        if(!HidD_GetAttributes(h,&attributes)||attributes.VendorID!=0x1532||!ModelForPid(attributes.ProductID)){CloseHandle(h);continue;}
-        PHIDP_PREPARSED_DATA pp = nullptr; HIDP_CAPS caps = {};
-        if (HidD_GetPreparsedData(h, &pp)) { HidP_GetCaps(pp, &caps); HidD_FreePreparsedData(pp); }
-        if (diagnostic) std::wcout << path << L" usage=" << caps.UsagePage << L":" << caps.Usage << L" feature=" << caps.FeatureReportByteLength << L"\n";
-        if (caps.UsagePage == 1 && caps.Usage == 2) {
-            int raw = -1;
-            if (Query(h, 0x80, raw)) {
-                result.connected = true; result.raw = raw; result.percent = (int)std::lround(raw * 100.0 / 255.0);
-                result.pid = attributes.ProductID;
-                int charging = -1;
-                if (Query(h, 0x84, charging) && charging <= 1) result.charging = charging;
-                CloseHandle(h); break;
-            }
-            if (diagnostic) std::wcout << L"  Telemetry query failed, Win32=" << GetLastError() << L"\n";
-        }
-        CloseHandle(h);
-    }
-    SetupDiDestroyDeviceInfoList(devices);
-    if (!result.connected) result.error = L"Мышь спит, отключена или HID занят";
-    return result;
-}
-void History::Load(const std::wstring& path) {
+void History::Load(const std::filesystem::path& path) {
     std::ifstream file{std::filesystem::path(path)}; Sample s;
     while (file >> s.time >> s.raw >> s.charging) if (s.raw >= 0 && s.raw <= 255 && s.time > Now() - 30 * 86400 && s.time <= Now()) samples.push_back(s);
     std::sort(samples.begin(), samples.end(), [](const Sample& a, const Sample& b) { return a.time < b.time; });
     if (samples.size() > 15000) samples.erase(samples.begin(), samples.end() - 15000);
 }
-void History::Save(const std::wstring& path) const {
-    std::wstring temp = path + L".tmp";
+void History::Save(const std::filesystem::path& path) const {
+    auto temp=path;temp+=L".tmp";
     { std::ofstream file{std::filesystem::path(temp)}; for (const auto& s : samples) file << s.time << ' ' << s.raw << ' ' << s.charging << '\n'; if (!file) return; }
-    MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    ReplaceFile(temp,path);
 }
 void History::Add(const Reading& r) {
     if (!r.connected || r.raw < 0 || r.charging < 0) return;

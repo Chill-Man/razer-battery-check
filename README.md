@@ -6,13 +6,14 @@
 
 ### Your mouse battery. One glance away.
 
-A lightweight, native Windows tray app for **Razer Basilisk V3 Pro** and **Basilisk V3 Pro 35K**.
+A lightweight desktop tray app for **Razer Basilisk V3 Pro** and **Basilisk V3 Pro 35K** — native Windows builds and a native **Linux preview**.
 Battery percentage, an estimate of time remaining to 1%, and a compact interface that stays out of your way.
 
 [![Downloads](https://img.shields.io/github/downloads/Chill-Man/razer-battery-check/total?style=for-the-badge&color=a5f57a&label=Downloads)](https://github.com/Chill-Man/razer-battery-check/releases)
 [![Latest release](https://img.shields.io/github/v/release/Chill-Man/razer-battery-check?style=for-the-badge&color=9ac9b0)](https://github.com/Chill-Man/razer-battery-check/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-dce8df?style=for-the-badge)](LICENSE)
 ![Platform](https://img.shields.io/badge/Windows-10%20%2F%2011-303e35?style=for-the-badge&logo=windows)
+![Linux preview](https://img.shields.io/badge/Linux-Preview-303e35?style=for-the-badge&logo=linux)
 ![Native C++](https://img.shields.io/badge/Native-C%2B%2B17-303e35?style=for-the-badge&logo=cplusplus)
 
 **[Releases](https://github.com/Chill-Man/razer-battery-check/releases)** · **[Build from source](#build-from-source)** · **[Report an issue](https://github.com/Chill-Man/razer-battery-check/issues)** · **[Русский](docs/README.ru.md)**
@@ -25,7 +26,7 @@ Battery percentage, an estimate of time remaining to 1%, and a compact interface
 
 Keep your battery percentage in the system tray and open the panel with a click. See the last confirmed charge, whether the mouse is charging, and how long it might last before reaching 1%.
 
-Basilisk Pulse reads telemetry directly through Windows HID APIs. It does not require a running Razer Synapse interface, an account, a browser engine, or a background web server. Mouse settings stay untouched.
+Basilisk Pulse reads telemetry directly through Windows HID APIs or Linux hidraw. It does not require a running Razer Synapse interface, an account, a browser engine, or a background web server. Mouse settings stay untouched. Windows uses Win32/Direct2D; Linux uses Qt 5 and shares the same C++ battery model and history logic.
 
 | At a glance | Under the hood |
 | :--- | :--- |
@@ -35,11 +36,38 @@ Basilisk Pulse reads telemetry directly through Windows HID APIs. It does not re
 | **Quiet motion** — soft ambient light and smooth switch transitions. | **Local storage** — no analytics, cloud sync, or network requests. |
 | **Optional autostart** — available in Settings. | **Motion on demand** — animation timers stop when the panel is hidden. |
 
+## Downloads
+
+Choose a native build for your operating system and processor. **Portable Windows ZIPs contain a standalone EXE**; Setup installers add a per-user installation and an uninstaller. History/preferences still live in your user profile.
+
+### Windows 10 / 11
+
+| Your PC | Portable ZIP | Setup installer |
+| :--- | :---: | :---: |
+| Most Intel / AMD PCs — **x64** | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-windows-x64-portable.zip) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-windows-x64-setup.exe) |
+| 32-bit Windows 10 — **x86 / x32** | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-windows-x86-portable.zip) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-windows-x86-setup.exe) |
+| Snapdragon / Windows on Arm — **ARM64** | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-windows-arm64-portable.zip) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-windows-arm64-setup.exe) |
+
+The ARM64 package contains a native ARM64 application; the Setup launcher itself uses x86 emulation. Windows 11 has no 32-bit x86 edition. Use the architecture in **Settings → System → About → System type**. Minimum Windows version: Windows 10 1607.
+
+### Linux preview
+
+| Processor | AppImage · bundled Qt | DEB · system Qt | Archive · system Qt |
+| :--- | :---: | :---: | :---: |
+| Intel / AMD **x86_64** · Ubuntu 22.04+ baseline | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-linux-x86_64.AppImage) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-linux-x86_64.deb) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-linux-x86_64.tar.gz) |
+| **aarch64 / ARM64** · Ubuntu 24.04+ baseline | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-linux-aarch64.AppImage) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-linux-aarch64.deb) | [Download](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/BasiliskPulse-1.5.0-linux-aarch64.tar.gz) |
+
+**[Linux setup, device permissions and desktop support →](docs/LINUX.md)**
+
+Linux is a native port, not a Wine package. Native regression tests and GUI rendering are checked in CI, but physical Linux HID telemetry is not yet hardware-verified. Tray support depends on your desktop; GNOME may need an AppIndicator-compatible extension. AppImage users also need the included udev rule for USB access. No macOS or 32-bit Linux build is currently provided.
+
+**Integrity:** compare your download with [SHA256SUMS.txt](https://github.com/Chill-Man/razer-battery-check/releases/download/v1.5.0/SHA256SUMS.txt). The full package list is on the [release page](https://github.com/Chill-Man/razer-battery-check/releases/tag/v1.5.0).
+
 ## Get started
 
 ### Portable
 
-Prebuilt downloads, when published, are available on the **[Releases page](https://github.com/Chill-Man/razer-battery-check/releases)**. Run `BasiliskPulse.exe` from a folder you intend to keep. If no release is available yet, [build it locally](#build-from-source).
+Download the matching Windows portable ZIP above, extract it, then run `BasiliskPulse.exe` from a folder you intend to keep. There are no extra runtime installers. For Linux, follow the [Linux guide](docs/LINUX.md).
 
 1. Connect your supported mouse through its HyperSpeed receiver or USB cable.
 2. Launch the app. Check the **hidden tray icons** near the Windows clock if the percentage is not immediately visible.
@@ -135,19 +163,24 @@ History is bounded to **30 days / 15,000 samples per model**. Cached and failed 
 
 ## Build from source
 
-Requires **Windows x64**, **Visual Studio Build Tools with Desktop development with C++**, and a **Windows 10/11 SDK**. No package manager or third-party C++ dependencies are required.
+Windows builds require **Visual Studio Build Tools with Desktop development with C++**, the target's MSVC C++ libraries/compiler, and a **Windows 10/11 SDK**. No third-party C++ runtime dependencies are required for Windows. Linux requires Qt 5 development libraries; see the [Linux source build](docs/LINUX.md#diagnostics-and-source-build).
 
 ```powershell
 git clone https://github.com/Chill-Man/razer-battery-check.git
 cd razer-battery-check
 .\build.ps1
+# Or select a target explicitly:
+.\build.ps1 -Architecture x86
+.\build.ps1 -Architecture arm64
 ```
 
 The script builds the executable with a static C runtime and runs the regression tests.
 
 ```text
-dist\BasiliskPulse.exe    Portable application
-build\tests.exe           Test executable
+dist\x64\BasiliskPulse.exe       Native x64 build (also copied to dist\BasiliskPulse.exe)
+dist\x86\BasiliskPulse.exe       Native x86 build
+dist\arm64\BasiliskPulse.exe     Native ARM64 build
+build\<architecture>\tests.exe  Architecture-specific regression tests
 ```
 
 Useful commands:
@@ -178,6 +211,10 @@ Tests cover discharge regression, quantized readings, charging, gaps, level incr
 ## Downloads badge
 
 The badge at the top uses GitHub's **release asset download counts** and updates automatically. It does not count clones, repository ZIP downloads, or unique users. Until release assets are published, a download total may be unavailable.
+
+## Release builds
+
+The [release workflow](.github/workflows/release.yml) builds and tests Windows x86/x64/ARM64 and Linux x86_64/aarch64 on native runners. It verifies PE targets, executable startup, silent Windows installation/uninstallation, Linux rendering and AppImage startup, then creates a draft release with checksums. Windows installer builds require Inno Setup 6.3 or newer.
 
 ## Credits and license
 
