@@ -10,7 +10,13 @@ if (!$compiler) { $compiler = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\$Ar
 if (!$compiler) { throw "MSVC compiler for $Architecture is not installed." }
 $msvc = Split-Path (Split-Path (Split-Path (Split-Path $compiler.FullName)))
 $sdkRoot = 'C:\Program Files (x86)\Windows Kits\10'
-$sdk = Get-ChildItem "$sdkRoot\Include" -Directory | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty Name
+$sdk = Get-ChildItem "$sdkRoot\Include" -Directory | Where-Object {
+    $_.Name -match '^10\.0\.\d+\.0$' -and
+    (Test-Path "$($_.FullName)\um\Windows.h") -and
+    (Test-Path "$sdkRoot\Lib\$($_.Name)\um\$Architecture\kernel32.lib") -and
+    ((Test-Path "$sdkRoot\bin\$($_.Name)\$hostTarget\rc.exe") -or (Test-Path "$sdkRoot\bin\$($_.Name)\x64\rc.exe"))
+} | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1 -ExpandProperty Name
+if (!$sdk) { throw "A complete Windows 10/11 SDK for $Architecture is not installed." }
 $env:INCLUDE = "$msvc\include;$sdkRoot\Include\$sdk\ucrt;$sdkRoot\Include\$sdk\shared;$sdkRoot\Include\$sdk\um;$sdkRoot\Include\$sdk\winrt"
 if (!(Test-Path "$msvc\lib\$Architecture\libcmt.lib")) { throw "MSVC C++ libraries for $Architecture are not installed." }
 $env:LIB = "$msvc\lib\$Architecture;$sdkRoot\Lib\$sdk\ucrt\$Architecture;$sdkRoot\Lib\$sdk\um\$Architecture"
