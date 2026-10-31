@@ -1,0 +1,1 @@
+A lightweight native Windows tray app for Razer Basilisk V3 Pro and V3 Pro 35K. Battery percentage, estimated time to 1%, local discharge history, resilient HID polling and smooth animations. Works without Razer Synapse, Electron or a background web server.
